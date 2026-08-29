@@ -14,7 +14,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract ZIP File
-        run: unzip -o phonelink-monitor.zip
+        run: |
+          unzip -o *.zip
+          # Jika isi proyek berada di dalam subfolder, pindahkan ke direktori root
+          if [ ! -d "app" ]; then
+            SUBDIR=$(find . -maxdepth 2 -type d -name "app" -exec dirname {} \;)
+            if [ -n "$SUBDIR" ] && [ "$SUBDIR" != "." ]; then
+              echo "Memindahkan isi subfolder $SUBDIR ke root..."
+              cp -r "$SUBDIR"/* .
+            fi
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -22,14 +31,62 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Auto-Detect Package & Generate Dummy Credentials
+        run: |
+          # 1. Generate debug.keystore di semua path pencarian default
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+          cp debug.keystore app/debug.keystore || true
+
+          # 2. Ambil applicationId asli dari build.gradle / AndroidManifest
+          PKG_NAME="com.example"
+          if [ -f "app/build.gradle.kts" ]; then
+            EXTRACTED_PKG=$(grep -o 'applicationId = "[^"]*"' app/build.gradle.kts | cut -d'"' -f2 || true)
+            if [ -n "$EXTRACTED_PKG" ]; then PKG_NAME="$EXTRACTED_PKG"; fi
+          fi
+
+          echo "Menggunakan package name: $PKG_NAME"
+
+          # 3. Buat file google-services.json dummy dengan package name yang cocok
+          cat << EOF > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "123456789012",
+              "project_id": "dummy-project",
+              "storage_bucket": "dummy-project.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789012:android:dummyappid123456",
+                  "android_client_info": {
+                    "package_name": "$PKG_NAME"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "dummy-api-key"
+                  }
+                ]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            **/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
