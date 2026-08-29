@@ -1,4 +1,4 @@
-name: Build APK & Inspect Project
+name: Build Android APK from ZIP
 
 on:
   push:
@@ -13,12 +13,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Extract ZIP and Inspect
-        run: |
-          unzip -o phonelink-monitor.zip
-          echo "=== DAFTAR FILE DALAM PROYEK ==="
-          ls -la
-          find . -maxdepth 3 -not -path '*/.*'
+      - name: Extract ZIP File
+        run: unzip -o phonelink-monitor.zip
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -26,21 +22,14 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Check and Build Android (if Gradle exists)
-        run: |
-          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -n "$GRADLEW_PATH" ]; then
-            PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-            cd "$PROJECT_DIR"
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          else
-            echo "Bukan proyek Android native (Gradle tidak ditemukan)."
-          fi
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Upload APK (if generated)
+      - name: Build APK
+        run: gradle assembleDebug
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: app-debug-apk
-          path: "**/build/outputs/apk/debug/*.apk"
+          path: app/build/outputs/apk/debug/*.apk
