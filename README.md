@@ -2,7 +2,7 @@
 
 ### Local Wi-Fi Telemetry & Device Monitoring for Android
 
-PhoneLink Monitor is an Android application designed to monitor the real-time hardware status of one Android device from another device over a **local Wi-Fi or hotspot network**.
+Phone SMonitor is an Android application designed to monitor the real-time hardware status of one Android device from another device over a **local Wi-Fi or hotspot network**.
 The application uses a **server-client architecture** where the monitored device runs a lightweight local HTTP server, while another device acts as a monitoring dashboard.
 No cloud server is required.
 
